@@ -1,0 +1,136 @@
+version 4
+
+// SEGMENT DEFINITION
+
+segment 1base
+	mesh 0 -.75  0
+	mesh  0 .75  0
+endsegment
+
+    // Markers
+    marker    1base1
+        parent    1base
+        position    0 -.75  0
+    endmarker
+    marker    1base2
+        parent    1base
+        position    0 .75  0
+    endmarker
+    marker    1basetarget
+        parent    1base
+        position    0 -1.944  0.37
+    endmarker
+
+segment 1seg
+    parent 1base
+    RTinMatrix    1
+    RT
+        1.0    0.0    0.0    0.0
+        0.0    1.0    0.0    0.0
+        0.0    0.0    1.0    0.0
+        0.0    0.0    0.0    1.0
+    rotations x
+    mass 10
+    rangesQ	-pi/2+0.1 pi/2-0.1
+    mesh  0 0 0
+	mesh  0 0 2
+endsegment
+
+    // Markers
+    marker    1seg1
+        parent    1seg
+        position    0 0 0
+    endmarker
+    marker    1seg2
+        parent    1seg
+        position    0 0 2
+    endmarker
+
+segment 2seg
+    parent 1seg
+    RTinMatrix    1
+    RT
+        1.0    0.0    0.0    0.0
+        0.0    0.0   -1.0    0.0
+        0.0    1.0    0.0    1.25
+        0.0    0.0    0.0    1.0
+    rotations x
+    mass 1
+    rangesQ	-pi/2+0.1 pi/2-0.1
+    mesh 0 0 0
+    mesh 0 0 .75
+endsegment
+
+
+    // Markers
+    marker    1seg2
+        parent    2seg
+        position    0 0 0
+    endmarker
+    marker    2seg2
+        parent    2seg
+        position    0 0 0.75
+    endmarker
+
+
+// MUSCLE DEFINITION
+
+// 1base > 1seg
+musclegroup 1base_to_1seg
+    OriginParent        1base
+    InsertionParent     1seg
+endmusclegroup
+
+    muscle    1seg_ago
+        Type    hillthelen
+        musclegroup    1base_to_1seg
+        OriginPosition    0 -0.5 0
+            InsertionPosition    0 0 0.5
+        optimalLength    0.7
+        maximalForce    1000
+        tendonSlackLength    0.04
+        pennationAngle    0.5
+        maxVelocity    10
+    endmuscle
+
+    muscle    1seg_antago
+        Type    hillthelen
+        musclegroup    1base_to_1seg
+        OriginPosition    0 0.5 0
+        InsertionPosition    0 0 0.5
+        optimalLength    0.7
+        maximalForce    1000
+        tendonSlackLength    0.04
+        pennationAngle    0.5
+        maxVelocity    10
+    endmuscle
+
+// 1seg > 2seg
+musclegroup 1seg_to_2seg
+    OriginParent        1seg
+    InsertionParent     2seg
+endmusclegroup
+
+    muscle    2seg_ago
+        Type    hillthelen
+        musclegroup    1seg_to_2seg
+        OriginPosition    0 0 .75
+        InsertionPosition   0 0 0.5
+        optimalLength    0.7
+        maximalForce    1000
+        tendonSlackLength    0.04
+        pennationAngle    0.5
+        maxVelocity    10
+    endmuscle
+
+    muscle    2seg_antago
+        Type    hillthelen
+        musclegroup    1seg_to_2seg
+        OriginPosition    0 0 1.75
+        InsertionPosition   0 0 0.5
+        optimalLength    0.7
+        maximalForce    1000
+        tendonSlackLength    0.04
+        pennationAngle    0.5
+        maxVelocity    10
+    endmuscle
