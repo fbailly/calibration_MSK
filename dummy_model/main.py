@@ -258,7 +258,7 @@ def calibration_iter(model_path,
         opts={}
     else:
         solver = Solver.IPOPT
-        opts={"linear_solver": "ma57", "max_iter": 50}
+        opts={"linear_solver": "ma57", "max_iter": 50, "print_level": 0}
     sol = ocp.solve(solver=solver, solver_options=opts)
     return sol
 
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     Ns = 24
     Duration = 1
     use_acados = False
-    n_iter = 100
+    n_iter = 10
     Ns_calib = 24
     Duration_calib = Duration*Ns_calib/Ns
     calib_gain = [1.3, 1.3, 1.8] # optimal gains
@@ -281,7 +281,7 @@ if __name__ == '__main__':
     orig_ins_point = [0.5, 0.5, 0.5, 0.5]
 
     ocp = generate_data(model_path, orig_fiso_max, orig_opt_len, orig_ins_point, Duration, Ns)
-    opts = {"linear_solver": "ma57", "tol": 1e-4}
+    opts = {"linear_solver": "ma57", "tol": 1e-4, "print_level": 0}
     sol = ocp.solve(solver_options=opts)
     muscles_ref = sol.controls['muscles'][:, :Ns_calib]
     states_ref = sol.states['all'][:, :Ns_calib+1]
