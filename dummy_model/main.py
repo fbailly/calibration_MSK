@@ -271,10 +271,10 @@ def calibration_iter(model_path,
                       Duration, Ns, muscles_ref, states_ref, use_acados=use_acados)
     if use_acados:
         solver = Solver.ACADOS
-        opts={}
+        opts={"print_level": 0}
     else:
         solver = Solver.IPOPT
-        opts={"linear_solver": "ma57", "max_iter": 50, "print_level": 0}
+        opts={"linear_solver": "ma57", "max_iter": 50, "print_level": 0, "hessian_approximation": "exact"}
     sol = ocp.solve(solver=solver, solver_options=opts)
     return sol
 
@@ -284,11 +284,11 @@ if __name__ == '__main__':
     Ns = 24
     Duration = 1
     use_acados = False
-    n_iter = 5
+    n_iter = 100
     Ns_calib = 24
     Duration_calib = Duration*Ns_calib/Ns
     # calib_gain = [1.3, 1.3, 1.8] # optimal gains
-    calib_gain = [1, 1, 1, 1]
+    calib_gain = [1.5, 1.5, 1, 1]
 
     # generate data with custom model
     model_path = "./dummy.bioMod"
@@ -307,8 +307,8 @@ if __name__ == '__main__':
     fiso_max = [600, 600, 950, 850]
     # opt_len = [0.69, 0.72, 0.68, 0.73]
     opt_len = [0.725, 0.66, 0.73, 0.68]
-    # ins_point = [0.5, 0.5, 0.5, 0.5]
-    ins_point = [0.475, 0.515, 0.48, 0.52]
+    ins_point = [0.5, 0.5, 0.5, 0.5]
+    # ins_point = [0.475, 0.515, 0.48, 0.52]
     # tendon_sl = [0.04, 0.04, 0.04, 0.04]
     tendon_sl = [0.01, 0.06, 0.02, 0.07]
 
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     success_vec = np.ones((1, n_iter))
 
     init_fiso_max = fiso_max.copy()
-    fiso_bounds = [300, 1200]
+    fiso_bounds = [500, 1100]
     init_opt_len = opt_len.copy()
     opt_len_bounds = [0.6, 0.8]
     init_ins_point = ins_point.copy()
@@ -328,15 +328,36 @@ if __name__ == '__main__':
     init_tendon_sl = tendon_sl.copy()
     tendon_sl_bounds = [0.005, 0.07]
 
-    opt_fiso = False
-    opt_opt_len = False
-    opt_ins_point = False
-    opt_tendon_sl = True
+    g_opt_fiso = True
+    g_opt_opt_len = True
+    g_opt_ins_point = False
+    g_opt_tendon_sl = True
 
     fiso_vec[:, 0] = fiso_max
     opt_len_vec[:, 0] = opt_len
     ins_point_vec[:, 0] = ins_point
     tendon_sl_vec[:, 0] = tendon_sl
+
+    if g_opt_tendon_sl:
+        tmp_opt = 'tendon'
+        opt_fiso = False
+        opt_opt_len = False
+        opt_ins_point = False
+        opt_tendon_sl = True
+    elif g_opt_opt_len:
+        opt_fiso = False
+        opt_opt_len = True
+        opt_ins_point = False
+        opt_tendon_sl = False
+        tmp_opt = 'opt_len'
+    elif g_opt_fiso:
+        opt_fiso = True
+        opt_opt_len = False
+        opt_ins_point = False
+        opt_tendon_sl = False
+        tmp_opt = 'fiso'
+
+    break_loop = False
 
     for i in range(n_iter):
         sol = calibration_iter(model_path, opt_fiso, opt_opt_len, opt_ins_point, opt_tendon_sl,
@@ -346,19 +367,24 @@ if __name__ == '__main__':
                                tendon_sl, init_tendon_sl, tendon_sl_bounds,
                                Duration_calib, Ns_calib, muscles_ref, states_ref, use_acados)
         success_vec[0, i] = sol.status
-        if opt_fiso:
+
+        if tmp_opt == 'fiso':
             fiso_vec[:, i+1] = sol.parameters['forces_iso_max'].squeeze()
             fiso_max = list(fiso_max + calib_gain[0]*(sol.parameters['forces_iso_max'].squeeze() - fiso_max))
             init_fiso_max = fiso_max
-            opt_len_vec[:, i] = opt_len
-            ins_point_vec[:, i] = ins_point
+            opt_len_vec[:, i+1] = opt_len
+            ins_point_vec[:, i+1] = ins_point
+            tendon_sl_vec[:, i+1] = tendon_sl
             print(f"{i}th iter")
             print(f"{sol.parameters['forces_iso_max']} N")
             print(f"Original model forces isomax : {orig_fiso_max} N")
             opt_fiso = False
             opt_ins_point = False
-            opt_opt_len = True
-        elif opt_opt_len:
+            opt_opt_len = False
+            opt_tendon_sl = True
+            tmp_opt = 'tendon'
+
+        elif tmp_opt == 'opt_len':
             opt_len_vec[:, i+1] = sol.parameters['optimal_length'].squeeze()
             opt_len = list(opt_len + calib_gain[1]*(sol.parameters['optimal_length'].squeeze() - opt_len))
             fiso_vec[:, i+1] = fiso_max
@@ -368,11 +394,17 @@ if __name__ == '__main__':
             print(f"{i}th iter")
             print(f"{sol.parameters['optimal_length']} m")
             print(f"Original model optimal length : {orig_opt_len} m")
-            opt_fiso = False
-            opt_ins_point = False
+
             opt_opt_len = False
-            opt_tendon_sl = True
-        elif opt_ins_point:
+            if g_opt_fiso:
+                tmp_opt = 'fiso'
+                opt_fiso = True
+                opt_tendon_sl = False
+            else:
+                tmp_opt = 'tendon'
+                opt_tendon_sl = True
+                opt_fiso = False
+        elif tmp_opt == 'ins_pt':
             ins_point_vec[:, i+1] = sol.parameters['insertion_point'].squeeze()
             ins_point = list(ins_point + calib_gain[2]*(sol.parameters['insertion_point'].squeeze() - ins_point))
             fiso_vec[:, i] = fiso_max
@@ -384,7 +416,7 @@ if __name__ == '__main__':
             opt_fiso = False
             opt_ins_point = False
             opt_opt_len = True
-        elif opt_tendon_sl:
+        elif tmp_opt == 'tendon':
             tendon_sl_vec[:, i+1] = sol.parameters['tendon_slack_len'].squeeze()
             tendon_sl = list(tendon_sl + calib_gain[3]*(sol.parameters['tendon_slack_len'].squeeze() - tendon_sl))
             fiso_vec[:, i+1] = fiso_max
@@ -398,11 +430,26 @@ if __name__ == '__main__':
             opt_ins_point = False
             opt_opt_len = True
             opt_tendon_sl = False
+            tmp_opt = 'opt_len'
 
-        if np.allclose(opt_len, orig_opt_len, 1e-2, 1e-2) \
-                and np.allclose(fiso_max, orig_fiso_max, 1e-1, 1e-1) \
-                and np.allclose(ins_point, orig_ins_point, 1e-2, 1e-2) \
-                and np.allclose(tendon_sl, orig_tendon_sl, 1e-3, 1e-3):
+        conv_tol = 1e-3
+
+        if g_opt_opt_len:
+            break_loop = np.allclose(opt_len, orig_opt_len, conv_tol, conv_tol)
+        else:
+            break_loop = True
+
+        if g_opt_fiso:
+            break_loop = np.allclose(fiso_max, orig_fiso_max, conv_tol, conv_tol)*break_loop
+        else:
+            break_loop = True*break_loop
+
+        if g_opt_tendon_sl:
+            break_loop = np.allclose(tendon_sl, orig_tendon_sl, conv_tol, conv_tol)*break_loop
+        else:
+            break_loop = True*break_loop
+
+        if break_loop:
             break
 
     forces_est = muscle_forces(sol.states['q'], sol.states['qdot'], sol.controls['muscles'], biorbd.Model(model_path))
@@ -425,36 +472,36 @@ if __name__ == '__main__':
     print(f"Percentage error on tendon sl : {np.mean(tendon_sl_err_percent)}")
 
     # sol.animate()
-    sol.graphs()
-
+    # sol.graphs()
+    plt.rcParams['font.size'] = '18'
     iters = np.linspace(0, i+1, num=i+2)
     plt.subplot(321)
     plt.plot(iters, fiso_vec[:, :i+2].T, 'x-', label='Calibration')
     plt.gca().set_prop_cycle(None)
     plt.plot(iters, np.repeat(np.array(orig_fiso_max, ndmin=2).T, i+2, 1).T, 'o--', label='True values')
     plt.legend()
-    plt.title(f'Forces isomax calibration. Optimized={opt_fiso}')
+    plt.title(f'Forces isomax calibration. Optimized={g_opt_fiso}')
     plt.xlabel('iterations')
     plt.ylabel('F_isomax')
     plt.subplot(322)
     plt.plot(iters, opt_len_vec[:, :i+2].T, 'x-', label='Calibration')
     plt.gca().set_prop_cycle(None)
     plt.plot(iters, np.repeat(np.array(orig_opt_len, ndmin=2).T, i+2, 1).T, 'o--', label='True values')
-    plt.title(f'Optimal length calibration. Optimized={opt_opt_len}')
+    plt.title(f'Optimal length calibration. Optimized={g_opt_opt_len}')
     plt.xlabel('iterations')
     plt.ylabel('Opt_length')
     plt.subplot(323)
     plt.plot(iters, ins_point_vec[:, :i+2].T, 'x-', label='Calibration')
     plt.gca().set_prop_cycle(None)
     plt.plot(iters, np.repeat(np.array(orig_ins_point, ndmin=2).T, i+2, 1).T, 'o--', label='True values')
-    plt.title(f'Insertion point calibration. Optimized={opt_ins_point}')
+    plt.title(f'Insertion point calibration. Optimized={g_opt_ins_point}')
     plt.xlabel('iterations')
     plt.ylabel('Ins_point')
     plt.subplot(324)
     plt.plot(iters, tendon_sl_vec[:, :i+2].T, 'x-', label='Calibration')
     plt.gca().set_prop_cycle(None)
     plt.plot(iters, np.repeat(np.array(orig_tendon_sl, ndmin=2).T, i+2, 1).T, 'o--', label='True values')
-    plt.title(f'Tendon slack len calibration. Optimized={opt_tendon_sl}')
+    plt.title(f'Tendon slack len calibration. Optimized={g_opt_tendon_sl}')
     plt.xlabel('iterations')
     plt.ylabel('slack len')
     plt.subplot(325)
