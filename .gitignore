@@ -3,3 +3,4 @@ c_generated_code
 *.ogv
 */.idea/
 */*.json
+*.npy
