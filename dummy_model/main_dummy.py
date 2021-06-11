@@ -196,7 +196,7 @@ def calibration_iter(model_path,
         opts={"print_level": 0}
     else:
         solver = Solver.IPOPT
-        opts={"linear_solver": "ma57", "max_iter": 200, "print_level": 0, "hessian_approximation": "exact"}
+        opts={"linear_solver": "ma57", "max_iter": 100, "print_level": 0, "hessian_approximation": "exact"}
     sol = ocp.solve(solver=solver, solver_options=opts)
     return sol
 
@@ -224,14 +224,12 @@ if __name__ == '__main__':
     states_ref = sol.states['all'][:, :Ns_calib+1]
     forces_ref = muscle_forces(sol.states['q'], sol.states['qdot'], sol.controls['muscles'], biorbd.Model(model_path))[:, :Ns_calib+1]
     # start with wrong model
-    # fiso_max = [547, 620, 1000, 895]
-    fiso_max = [600, 600, 1050, 1000]
-    # fiso_max = [500, 500, 1200, 700]
+    fiso_max = [825, 920, 1200, 1125]
+    # fiso_max = [600, 600, 1050, 1000]
     # opt_len = [0.69, 0.72, 0.68, 0.73]
     opt_len = [0.725, 0.66, 0.73, 0.68]
-    # opt_len = [0.8, 0.6, 0.8, 0.6]
-    tendon_sl = [0.2, 0.2, 0.2, 0.2]
-    # tendon_sl = [0.22, 0.18, 0.21, 0.17]
+    # tendon_sl = [0.2, 0.2, 0.2, 0.2]
+    tendon_sl = [0.22, 0.18, 0.21, 0.17]
 
     # recursively match data with optimized model
     fiso_vec = np.zeros((4, n_iter+2))
@@ -244,11 +242,11 @@ if __name__ == '__main__':
     init_opt_len = opt_len.copy()
     opt_len_bounds = [0.6, 0.8]
     init_tendon_sl = tendon_sl.copy()
-    tendon_sl_bounds = [0.1, 0.3]
+    tendon_sl_bounds = [0.1, 0.5]
 
-    g_opt_fiso = True
+    g_opt_fiso = False
     g_opt_opt_len = True
-    g_opt_tendon_sl = False  # False, True, "LOW_FREQ"
+    g_opt_tendon_sl = True  # False, True, "LOW_FREQ"
     freq_tendon_calib = 10
 
     fiso_vec[:, 0] = fiso_max
@@ -289,8 +287,10 @@ if __name__ == '__main__':
             print(f"Original model forces isomax : {orig_fiso_max} N")
             if g_opt_tendon_sl == True:
                 param_opt_vec, param_opt = set_param_opt('tendon')
-            else:
+            elif g_opt_opt_len:
                 param_opt_vec, param_opt = set_param_opt('opt_len')
+            else:
+                pass
 
         elif param_opt == 'opt_len':
             opt_len_vec[:, i+1] = sol.parameters['optimal_length'].squeeze()
@@ -303,8 +303,10 @@ if __name__ == '__main__':
             print(f"Original model optimal length : {orig_opt_len} m")
             if g_opt_fiso:
                 param_opt_vec, param_opt = set_param_opt('fiso')
-            else:
+            elif g_opt_tendon_sl:
                 param_opt_vec, param_opt = set_param_opt('tendon')
+            else :
+                pass
 
         elif param_opt == 'tendon':
             tendon_sl_vec[:, i+1] = sol.parameters['tendon_slack_len'].squeeze()
@@ -315,8 +317,12 @@ if __name__ == '__main__':
             print(f"{i}th iter")
             print(f"{sol.parameters['tendon_slack_len']} m")
             print(f"Original model tendon slack len : {orig_tendon_sl} m")
-            param_opt_vec, param_opt = set_param_opt('opt_len')
-
+            if g_opt_opt_len:
+                param_opt_vec, param_opt = set_param_opt('opt_len')
+            elif g_opt_fiso:
+                param_opt_vec, param_opt = set_param_opt('fiso')
+            else:
+                pass
         conv_tol = 1e-2
 
         if g_opt_opt_len:
