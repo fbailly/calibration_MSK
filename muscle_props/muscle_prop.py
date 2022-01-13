@@ -1,5 +1,4 @@
 from utils import *
-import biorbd
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from casadi import MX, Function, vertcat
@@ -56,15 +55,17 @@ nmus = model.nbMuscles()
 
 fiso_max = [825, 920, 1200, 1125]
 opt_len = [0.69, 0.72, 0.68, 0.73]
-tendon_sl = [0.1, 0.1, 0.1, 0.1]
+tendon_sl = [0.2, 0.2, 0.2, 0.2]
 
 # reference motion
 Ns = 32
 duration = 1
 dt = duration/Ns
 ocp = generate_data(model_path, fiso_max, opt_len, tendon_sl, duration, Ns)
-opts = {"linear_solver": "ma57", "tol": 1e-4, "print_level": 5}
-sol = ocp.solve(solver_options=opts)
+solver = Solver.IPOPT()
+solver.set_linear_solver('ma57')
+solver.set_tol(1e-4)
+sol = ocp.solve(solver)
 muscles_ref = sol.controls['muscles']
 states_ref = sol.states['all']
 
@@ -76,7 +77,6 @@ set_tendon_sl(model, tendon_sl)
 # integrate
 cas_fun = act_dynamics_cas()
 ratio = 100
-
 states, t_full = integrate_motion(ratio)
 
 # plot
@@ -86,8 +86,8 @@ plt.plot(t_full[::ratio, ], states[:, ::ratio].T, 'x')
 
 # change muscle properties
 fiso_max_n = [825, 920, 1200, 1125]
-opt_len_n = [0.69, 0.72, 0.68, 0.73]
-tendon_sl_n = [0.2, 0.2, 0.2, 0.2]
+opt_len_n = [0.6868, 0.7523, 0.6696, 0.756]
+tendon_sl_n = [0.208, 0.175, 0.209, 0.172]
 set_fiso_max(model, fiso_max_n)
 set_opt_len(model, opt_len_n)
 set_tendon_sl(model, tendon_sl_n)

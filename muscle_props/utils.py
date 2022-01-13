@@ -1,8 +1,9 @@
 import bioviz
-import biorbd
+import biorbd_casadi as biorbd
 import numpy as np
 from bioptim import (OdeSolver, OptimalControlProgram, ObjectiveFcn, ObjectiveList,
-                     Node, DynamicsList, DynamicsFcn, BoundsList, InitialGuessList, QAndQDotBounds)
+                     Node, DynamicsList, DynamicsFcn, BoundsList, InitialGuessList, QAndQDotBounds,
+                     Solver)
 
 def display_model(path):
     b = bioviz.Viz(path)
@@ -55,17 +56,19 @@ def generate_data(
 
     # Add objective functions
     objective_functions = ObjectiveList()
-    objective_functions.add(ObjectiveFcn.Lagrange.MINIMIZE_MUSCLES_CONTROL)
+    objective_functions.add(ObjectiveFcn.Lagrange.MINIMIZE_CONTROL, key='muscles')
     objective_functions.add(
         ObjectiveFcn.Mayer.SUPERIMPOSE_MARKERS, first_marker='1basetarget', second_marker='2seg2', weight=0
     )
-    objective_functions.add(ObjectiveFcn.Mayer.MINIMIZE_STATE, index=[2, 3], node=Node.START, weight=1e4)
-    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.MID, target=np.array([-0.7, -0.9, 0, 0], ndmin=2).T, weight=1e4)
-    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.END, target=np.array([0.7, 0.9, 0, 0], ndmin=2).T, weight=1e4)
+    objective_functions.add(ObjectiveFcn.Mayer.MINIMIZE_STATE, key='qdot',  node=Node.START, weight=1e4)
+    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.MID, key='q', target=np.array([-0.7, -0.9], ndmin=2).T, weight=1e4)
+    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.MID, key='qdot', target=np.array([0, 0], ndmin=2).T, weight=1e4)
+    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.END, key='q', target=np.array([0.7, 0.9], ndmin=2).T, weight=1e4)
+    objective_functions.add(ObjectiveFcn.Mayer.TRACK_STATE, node=Node.END, key='qdot', target=np.array([0, 0], ndmin=2).T, weight=1e4)
 
     # Dynamics
     dynamics = DynamicsList()
-    dynamics.add(DynamicsFcn.MUSCLE_ACTIVATIONS_DRIVEN)
+    dynamics.add(DynamicsFcn.MUSCLE_DRIVEN)
 
     # Path constraint
     x_bounds = BoundsList()

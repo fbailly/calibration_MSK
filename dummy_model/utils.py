@@ -1,5 +1,5 @@
 import bioviz
-import biorbd
+import biorbd_casadi as biorbd
 from casadi import MX, Function
 import numpy as np
 

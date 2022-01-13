@@ -31,6 +31,10 @@ segment 1seg
         0.0    0.0    0.0    1.0
     rotations x
     mass 10
+    inertia
+        1 0 0
+        0 1 0
+        0 0 1
     rangesQ	-pi/2+0.1 pi/2-0.1
     mesh  0 0 0
 	mesh  0 0 2
@@ -56,6 +60,10 @@ segment 2seg
         0.0    0.0    0.0    1.0
     rotations x
     mass 1
+    inertia
+        1 0 0
+        0 1 0
+        0 0 1
     rangesQ	-pi/2+0.1 pi/2-0.1
     mesh 0 0 0
     mesh 0 0 .75
