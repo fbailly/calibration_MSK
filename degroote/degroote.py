@@ -11,7 +11,7 @@ def f_tendon(lt_n):
 
 def f_act(lm_n):
     '''active muscle force'''
-    if (type(lm_n) is int) or (type(lm_n) is float):
+    if (type(lm_n) is int) or (type(lm_n) is float) :
         lm_n = np.ndarray(lm_n)[:, np.newaxis]
     if (type(lm_n) is np.ndarray) and (len(lm_n.shape) == 1):
         lm_n = lm_n[:, np.newaxis]
@@ -43,19 +43,33 @@ def f_m(a, lm_n, vm_n):
     return f0*(a*f_act(lm_n)*f_v(vm_n)+f_pas(lm_n))
 
 
-def ode_opensim(t, lm, lt, alpha, a):
+def lm_ode_opensim(t, lm, act):
     '''Thelen 2003 implementation'''
-    return inv_f_v((f_tendon(lt)/np.cos(alpha)-f_pas(lm))/a*f_act(lm))
+    lt = lmt - np.sqrt(lm**2-(lm_opt*np.sin(alpha0))**2)  # (S23 of Degroote)
+    cos_alpha = (lmt - lt)/lm  # (S18 of Degroote)
+    return np.array([inv_f_v((f_tendon(lt/lt_sl)/cos_alpha-f_pas(lm[0]))/act*f_act(lm))]).squeeze()
 
-lt = 1.01
-alpha = np.pi/8
-a = 0.2
-tf = 1
-lm0 = 1.2
 
-#plot_muscle_char(f_tendon, f_act, f_pas, f_v)
-sol = solve_ivp(ode_opensim, (0, tf), y0=np.array([lm0]), args=(lt, alpha, a))
-sol_interp = interp1d(sol.t, sol.y)
-time_interp = np.linspace(0, tf, num=1000)
-plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T)
+lmt = 0.35  # musculo-tendon len
+lm_opt = 0.25  # optimal fiber len
+lt_sl = 0.1  # tendon slack len
+alpha0 = np.pi/4  # pennation angle at optimal fiber len
+a = 0.3  # activation (input)
+tf = 0.2  # simulation duration
+lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
+
+# plot_muscle_char(f_tendon, f_act, f_pas, f_v)
+
+for a_ in np.arange(0.01, 1.0, 0.1):
+    sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0+np.random.rand()*0.1]), args=(a_,), method='RK45')
+    sol_interp = interp1d(sol.t, sol.y, kind='cubic')
+    time_interp = np.linspace(0, tf, num=int(10000*tf))
+    plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'a={a_:.2f}')
+    plt.xlabel('time (s)')
+    plt.xlabel('time (s)')
+    plt.title('Normalized muscle length for varying activation levels')
+    plt.legend()
+
+
+plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
 plt.show()
