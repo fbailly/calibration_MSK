@@ -50,24 +50,52 @@ def lm_ode_opensim(t, lm, act):
     return np.array([inv_f_v((f_tendon(lt/lt_sl)/cos_alpha-f_pas(lm[0]))/act*f_act(lm))]).squeeze()
 
 
+def ft_ode_degroote(t, ft, act):
+    lt_n = 1/kt*np.log(1/C[0, 0]*(ft+C[0, 2]))+C[0, 1]
+    lm = np.sqrt((lm_opt*np.sin(alpha0))**2 + (lmt - lt_n*lt_sl)**2)
+    cos_alpha = (lmt-lt_n*lt_sl)/lm
+    fm = ft/cos_alpha
+    fvm = (fm-f_pas(lm/lm_opt))/(act*f_act(np.array([lm/lm_opt])))
+    vm = inv_f_v(fvm)
+    vt_n = vmt - vm/cos_alpha
+    dft = C[0, 0]*kt*np.exp(kt*(lt_n-C[0, 1]))*vt_n
+    return dft[0]
+
+
 lmt = 0.35  # musculo-tendon len
+vmt =  0  # isostatic condition
 lm_opt = 0.25  # optimal fiber len
 lt_sl = 0.1  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
 a = 0.3  # activation (input)
 tf = 0.2  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
+ft0 = 0.5
+
 
 # plot_muscle_char(f_tendon, f_act, f_pas, f_v)
 
-for a_ in np.arange(0.01, 1.0, 0.1):
+
+plt.subplot(121)
+for a_ in np.arange(0.1, 1.0, 0.1):
     sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0+np.random.rand()*0.1]), args=(a_,), method='RK45')
     sol_interp = interp1d(sol.t, sol.y, kind='cubic')
     time_interp = np.linspace(0, tf, num=int(10000*tf))
     plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'a={a_:.2f}')
     plt.xlabel('time (s)')
+    plt.ylabel('Muscle length')
+    plt.title('Normalized muscle length for varying activation levels\nOpensim-Thelen (2003)')
+    plt.legend()
+
+plt.subplot(122)
+for a_ in np.arange(0.1, 1.0, 0.1):
+    sol = solve_ivp(ft_ode_degroote, (0, tf), y0=np.array([ft0+np.random.rand()*0.3]), args=(a_,), method='RK45')
+    sol_interp = interp1d(sol.t, sol.y, kind='cubic')
+    time_interp = np.linspace(0, tf, num=int(10000*tf))
+    plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'a={a_:.2f}')
     plt.xlabel('time (s)')
-    plt.title('Normalized muscle length for varying activation levels')
+    plt.ylabel('Tendon force')
+    plt.title('Normalized tendon force for varying activation levels\nDegroote (2016)')
     plt.legend()
 
 
