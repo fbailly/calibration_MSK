@@ -68,9 +68,9 @@ lm_opt = 0.25  # optimal fiber len
 lt_sl = 0.1  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
 a = 0.3  # activation (input)
-tf = 0.2  # simulation duration
+tf = 0.25  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
-ft0 = 0.5
+ft0 = 0.5  # initial guess for the ivp problem (further noised)
 
 
 # plot_muscle_char(f_tendon, f_act, f_pas, f_v)
@@ -78,7 +78,7 @@ ft0 = 0.5
 
 plt.subplot(121)
 for a_ in np.arange(0.1, 1.0, 0.1):
-    sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0+np.random.rand()*0.1]), args=(a_,), method='RK45')
+    sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0+np.random.rand()*0.2]), args=(a_,), method='RK45')
     sol_interp = interp1d(sol.t, sol.y, kind='cubic')
     time_interp = np.linspace(0, tf, num=int(10000*tf))
     plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'a={a_:.2f}')
@@ -89,7 +89,7 @@ for a_ in np.arange(0.1, 1.0, 0.1):
 
 plt.subplot(122)
 for a_ in np.arange(0.1, 1.0, 0.1):
-    sol = solve_ivp(ft_ode_degroote, (0, tf), y0=np.array([ft0+np.random.rand()*0.3]), args=(a_,), method='RK45')
+    sol = solve_ivp(ft_ode_degroote, (0, tf), y0=np.array([ft0+np.random.rand()*0.5]), args=(a_,), method='RK45')
     sol_interp = interp1d(sol.t, sol.y, kind='cubic')
     time_interp = np.linspace(0, tf, num=int(10000*tf))
     plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'a={a_:.2f}')
