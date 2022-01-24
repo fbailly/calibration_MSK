@@ -67,7 +67,7 @@ vmt =  0  # isostatic condition
 lm_opt = 0.25  # optimal fiber len
 lt_sl = 0.1  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
-a = 0.3  # activation (input)
+a = 0.1  # activation (input)
 tf = 0.25  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
 ft0 = 0.5  # initial guess for the ivp problem (further noised)
@@ -97,7 +97,30 @@ for a_ in np.arange(0.1, 1.0, 0.1):
     plt.ylabel('Tendon force')
     plt.title('Normalized tendon force for varying activation levels\nDegroote (2016)')
     plt.legend()
-
-
 plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
+
+plt.figure()
+plt.subplot(121)
+for lm0 in np.arange(0.35, 0.6, 0.01):
+    sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), method='RK45')
+    sol_interp = interp1d(sol.t, sol.y, kind='cubic')
+    time_interp = np.linspace(0, tf, num=int(10000*tf))
+    plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'lm0={lm0:.2f}')
+    plt.xlabel('time (s)')
+    plt.ylabel('Muscle length')
+    plt.title('Normalized muscle length for varying initial conditions of MT length\nOpensim-Thelen (2003)')
+    plt.legend()
+
+plt.subplot(122)
+for ft0 in np.arange(0.2, 0.8, 0.02):
+    sol = solve_ivp(ft_ode_degroote, (0, tf), y0=np.array([ft0]), args=(a,), method='RK45')
+    sol_interp = interp1d(sol.t, sol.y, kind='cubic')
+    time_interp = np.linspace(0, tf, num=int(10000*tf))
+    plt.plot(time_interp[:, np.newaxis], sol_interp(time_interp).T, label=f'ft0={ft0:.2f}')
+    plt.xlabel('time (s)')
+    plt.ylabel('Tendon force')
+    plt.title('Normalized tendon force for varying intial conditions\nDegroote (2016)')
+    plt.legend()
+plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
+
 plt.show()
