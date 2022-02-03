@@ -1,18 +1,25 @@
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d
 from utils import *
-from math import isclose
 
 
-def check_equilibrium(lm):
-    vm = lm_ode_opensim(0, np.array([lm]), a)
+def check_equilibrium(lm, act):
+    vm = lm_ode_opensim(0, np.array([lm]), act)
     alpha = np.arcsin(lm_opt*np.sin(alpha0)/lm)
     lt = lmt - lm*np.cos(alpha)
     mf = (a*f_act(lm/lm_opt)*f_v(vm) + f_pas(lm/lm_opt))*np.cos(alpha)
     tf = f_tendon(lt/lt_sl)
-    # return isclose(mf, tf)
-    return (mf ,tf, vm)
+    return mf, tf, vm
+
+
+def plot_phase(lms, act):
+    vms = check_equilibrium(lms, act)[2]
+    plt.quiver(lms[:-1], vms[:-1], np.sign(vms[:-1])*(lms[1:]-lms[:-1]), np.sign(vms[:-1])*(vms[1:]-vms[:-1]),
+               scale_units='xy', angles='xy', scale=1)
+    plt.plot(lms[np.argmin(np.abs(vms))], vms[np.argmin(np.abs(vms))], 'ro')
+    plt.plot(lms, np.zeros(lms.shape), 'r')
+    return
+
 
 def f_tendon(lt_n):
     '''tendon force'''
@@ -72,12 +79,49 @@ def ft_ode_degroote(t, ft, act):
     return dft[0]
 
 
+def dv_dA(lm, act):
+    da = dA_dl(lm, act)
+    lt = lmt - np.sqrt(lm**2-(lm_opt*np.sin(alpha0))**2)  # (S23 of Degroote)
+    cos_alpha = (lmt - lt)/lm  # (S18 of Degroote)
+    a = (f_tendon(lt/lt_sl)/cos_alpha-f_pas(lm/lm_opt))/(act*f_act(lm/lm_opt))
+    return da/(D[0, 0]*D[0, 1])*np.cosh(1/D[0, 0]*(a - D[0, 3]))
+
+
+def dA_dl(lm, act):
+    gact = np.zeros((1, 3))
+    dgact = np.zeros((1, 3))
+    lt = lmt - np.sqrt(lm**2-(lm_opt*np.sin(alpha0))**2)  # (S23 of Degroote)
+    cos_alpha = (lmt - lt)/lm  # (S18 of Degroote)
+    for i in range(3):
+        gact[:, i] = -0.5*(lm - B[1, i])**2 / 2*(B[2, i] + B[3, i] * lm0)
+        dgact[:, i] = -(2*lm*B[2, i] + lm**2*B[3, i] - 2*B[1, i]*B[2, i] - B[3, i]*(B[1, i])**2)/(2*(B[2, i]+B[3, i]*lm)**2)
+    b0dgact = np.multiply(B[0, :], dgact)
+    dfact = np.sum(np.multiply(b0dgact, np.exp(gact)))
+    dfpas = kpe/e0*np.exp(kpe*(lm-1)/e0)/(np.exp(kpe)-1)
+    da_num = -dfpas*act*f_act(lm) - (f_tendon(lt/lt_sl)/cos_alpha-f_pas(lm/lm_opt))*act*dfact
+    da_denum = (act*f_act(lm))**2
+    return da_num/da_denum
+
+
+def dv_dl(lm, act):
+    dv_da = dv_dA(lm, act)
+    da_dl = dA_dl(lm, act)
+    return dv_da*da_dl
+
+
+def check_dv_dl(lm, act):
+    eps = 1e-8
+    vm = lm_ode_opensim(0, np.array([lm]), act)
+    dvm = lm_ode_opensim(0, np.array([lm+eps]), act)
+    return (vm-dvm)/eps
+
+
 lmt = 0.35  # musculo-tendon len
 vmt = 0  # isostatic condition
 lm_opt = 0.25  # optimal fiber len
 lt_sl = 0.1  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
-a = 0.1  # activation (input)
+a = 0.5  # activation (input)
 tf = 0.1  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
 ft0 = 0.5  # initial guess for the ivp problem (further noised)
@@ -85,18 +129,27 @@ ratio_interp = 1000
 time_interp = np.linspace(0, tf, num=int(ratio_interp*tf))
 # plot_muscle_char(f_tendon, f_act, f_pas, f_v)
 
-print(f"Before solving, equilibirum is {check_equilibrium(lm0)}")
+print(dv_dl(lm0, a))
+print(check_dv_dl(lm0, a))
+print(f"Before solving, equilibirum is {check_equilibrium(lm0, a)}")
 sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
-print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1])}")
-lms = np.linspace(0.303, 0.31, num=1000)
-print(f"Muscle velocity is cancelled at lm={lms[np.argmin(np.abs(check_equilibrium(lms)[2]))]}")
-plt.plot(lms, check_equilibrium(lms)[1], "-o", label='tf')
-plt.plot(lms, check_equilibrium(lms)[0][0, ], "-x", label='mf')
-plt.plot(lms, check_equilibrium(lms)[2], label='vm')
+print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1], a)}")
+lms = np.linspace(0.302, 0.31, num=300)
+for a in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+    plot_phase(lms, a)
+plt.ylim([-1, 1])
+plt.xlim([0.302, 0.306])
+plt.show()
 
+mf_eq, tf_eq, vm_eq = check_equilibrium(lms, a)
+print(f"Muscle velocity is cancelled at lm={lms[np.argmin(np.abs(vm_eq))]}")
+plt.plot(lms, tf_eq, "-o", label='tf')
+plt.plot(lms, mf_eq[0, ], "-x", label='mf')
+plt.plot(lms, vm_eq, label='vm')
+plt.figure()
 plt.legend()
-# plt.show()
 
+plt.figure()
 plt.subplot(121)
 for a_ in np.arange(0.3, 1.0, 0.1):
     sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a_,), dense_output=True, method='RK45')
