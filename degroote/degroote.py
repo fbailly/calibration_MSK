@@ -148,8 +148,8 @@ def check_dv_dl(lm, act):
 
 lmt = 0.35  # musculo-tendon len
 vmt = 0  # isostatic condition
-lm_opt = 0.4  # optimal fiber len
-lt_sl = 0.1  # tendon slack len
+lm_opt = 0.25  # optimal fiber len
+lt_sl = 0.15  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
 a = 0.5  # activation (input)
 tf = 0.1  # simulation duration
@@ -165,11 +165,10 @@ print(f"Before solving, equilibirum is {check_equilibrium(lm0, a)}")
 sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
 print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1], a)}")
 plot_phase(np.linspace(0.1, 1, num=10), sns.color_palette())
-plt.show()
 
 plt.figure()
 plt.subplot(121)
-for a_ in np.arange(0.3, 1.0, 0.1):
+for a_ in np.arange(0.1, 1.0, 0.1):
     sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a_,), dense_output=True, method='RK45')
     plt.plot(time_interp[:, np.newaxis], sol.sol(time_interp).T, label=f'a={a_:.2f}')
     plt.xlabel('time (s)')
