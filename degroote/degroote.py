@@ -1,7 +1,6 @@
-import numpy as np
 from scipy.integrate import solve_ivp
 from utils import *
-
+import seaborn as sns
 
 def check_equilibrium(lm, act):
     vm = lm_ode_opensim(0, np.array([lm]), act)
@@ -12,12 +11,43 @@ def check_equilibrium(lm, act):
     return mf, tf, vm
 
 
-def plot_phase(lms, act):
-    vms = check_equilibrium(lms, act)[2]
-    plt.quiver(lms[:-1], vms[:-1], np.sign(vms[:-1])*(lms[1:]-lms[:-1]), np.sign(vms[:-1])*(vms[1:]-vms[:-1]),
-               scale_units='xy', angles='xy', scale=1)
-    plt.plot(lms[np.argmin(np.abs(vms))], vms[np.argmin(np.abs(vms))], 'ro')
+def search_equilibrium(act):
+    vm_pos = 1e10
+    lm_pos = np.array([0.5*lm0])
+    while vm_pos > 1e-2:
+        vm_pos = lm_ode_opensim(0, lm_pos, act)
+        lm_pos += 0.001
+        if np.isnan(vm_pos):
+            vm_pos = 1e10
+    lm_neg = np.array([1.5*lm0])
+    vm_neg = -1e10
+    while vm_neg < -1e-2:
+        vm_neg = lm_ode_opensim(0, lm_neg, act)
+        lm_neg -= 0.001
+        if np.isnan(vm_neg):
+            vm_pos = -1e10
+    if np.isclose(lm_pos, lm_neg, rtol=1e-1, atol=1e-1):
+        return (lm_pos+lm_neg)/2
+    else:
+        raise(AssertionError("equilibrium not reached"))
+
+
+def plot_phase(act, color):
+    eq_points = []
+    for ac in act:
+        eq_points += [search_equilibrium(ac)]
+    lms = np.linspace(np.min(eq_points)-5e-4, np.max(eq_points)+5e-4, 200)
+    for c, ac in enumerate(act):
+        vms = check_equilibrium(lms, ac)[2]
+        plt.quiver(lms[:-1], vms[:-1], np.sign(vms[:-1])*(lms[1:]-lms[:-1]), np.sign(vms[:-1])*(vms[1:]-vms[:-1]),
+                scale_units='xy', angles='xy', scale=1, color=color[c], label=f"activation={ac:0.1f}")
+        plt.plot(lms[np.argmin(np.abs(vms))], vms[np.argmin(np.abs(vms))], 'ro')
     plt.plot(lms, np.zeros(lms.shape), 'r')
+    plt.legend()
+    plt.xlabel("Muscle length")
+    plt.ylabel("Muscle velocity")
+    plt.ylim([-1, 1])
+    plt.title("Phase space trajectory of Opensim-Thelen Hill muscle for varying activations")
     return
 
 
@@ -118,7 +148,7 @@ def check_dv_dl(lm, act):
 
 lmt = 0.35  # musculo-tendon len
 vmt = 0  # isostatic condition
-lm_opt = 0.25  # optimal fiber len
+lm_opt = 0.4  # optimal fiber len
 lt_sl = 0.1  # tendon slack len
 alpha0 = np.pi/4  # pennation angle at optimal fiber len
 a = 0.5  # activation (input)
@@ -134,20 +164,8 @@ print(check_dv_dl(lm0, a))
 print(f"Before solving, equilibirum is {check_equilibrium(lm0, a)}")
 sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
 print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1], a)}")
-lms = np.linspace(0.302, 0.31, num=300)
-for a in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-    plot_phase(lms, a)
-plt.ylim([-1, 1])
-plt.xlim([0.302, 0.306])
+plot_phase(np.linspace(0.1, 1, num=10), sns.color_palette())
 plt.show()
-
-mf_eq, tf_eq, vm_eq = check_equilibrium(lms, a)
-print(f"Muscle velocity is cancelled at lm={lms[np.argmin(np.abs(vm_eq))]}")
-plt.plot(lms, tf_eq, "-o", label='tf')
-plt.plot(lms, mf_eq[0, ], "-x", label='mf')
-plt.plot(lms, vm_eq, label='vm')
-plt.figure()
-plt.legend()
 
 plt.figure()
 plt.subplot(121)
