@@ -16,14 +16,14 @@ def search_equilibrium(act):
     lm_pos = np.array([0.5*lm0])
     while vm_pos > 1e-2:
         vm_pos = lm_ode_opensim(0, lm_pos, act)
-        lm_pos += 0.001
+        lm_pos += 0.00001
         if np.isnan(vm_pos):
             vm_pos = 1e10
     lm_neg = np.array([1.5*lm0])
     vm_neg = -1e10
     while vm_neg < -1e-2:
         vm_neg = lm_ode_opensim(0, lm_neg, act)
-        lm_neg -= 0.001
+        lm_neg -= 0.00001
         if np.isnan(vm_neg):
             vm_pos = -1e10
     if np.isclose(lm_pos, lm_neg, rtol=1e-1, atol=1e-1):
@@ -66,7 +66,7 @@ def f_act(lm_n):
     f = np.zeros((siz, 1))
     for i in range(siz):
         f[i, 0] = np.sum(np.multiply(B[0, :], np.exp(
-            np.divide(-0.5*np.square(lm_n[i, 0]-B[1, :]), (B[2, :] + B[3, :]*lm_n[i, 0])))))
+            np.divide(-0.5*np.square(lm_n[i, 0]-B[1, :]), np.square(B[2, :] + B[3, :]*lm_n[i, 0])))))
     return f
 
 
@@ -157,8 +157,9 @@ lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further
 ft0 = 0.5  # initial guess for the ivp problem (further noised)
 ratio_interp = 1000
 time_interp = np.linspace(0, tf, num=int(ratio_interp*tf))
-# plot_muscle_char(f_tendon, f_act, f_pas, f_v)
+plot_muscle_char(f_tendon, f_act, f_pas, f_v)
 
+print(search_equilibrium(0.1))
 print(dv_dl(lm0, a))
 print(check_dv_dl(lm0, a))
 print(f"Before solving, equilibirum is {check_equilibrium(lm0, a)}")
