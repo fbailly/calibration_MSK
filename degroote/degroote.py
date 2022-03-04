@@ -11,19 +11,19 @@ def check_equilibrium(lm, act):
     return mf, tf, vm
 
 
-def search_equilibrium(act):
+def search_equilibrium(act, tol=1e-3, step=1e-4):
     vm_pos = 1e10
     lm_pos = np.array([0.5*lm0])
-    while vm_pos > 1e-2:
+    while vm_pos > tol:
         vm_pos = lm_ode_opensim(0, lm_pos, act)
-        lm_pos += 0.0001
+        lm_pos += step
         if np.isnan(vm_pos):
             vm_pos = 1e10
     lm_neg = np.array([1.5*lm0])
     vm_neg = -1e10
-    while vm_neg < -1e-2:
+    while vm_neg < -tol:
         vm_neg = lm_ode_opensim(0, lm_neg, act)
-        lm_neg -= 0.0001
+        lm_neg -= step
         if np.isnan(vm_neg):
             vm_pos = -1e10
     if np.isclose(lm_pos, lm_neg, rtol=1e-1, atol=1e-1):
@@ -36,17 +36,24 @@ def plot_phase(act, color):
     eq_points = []
     for ac in act:
         eq_points += [search_equilibrium(ac)]
-    lms = np.linspace(np.min(eq_points)-1e-3, np.max(eq_points)+1e-3, 200)
+    siz = 200
+    lms = np.linspace(np.min(eq_points)-1e-3, np.max(eq_points)+1e-3, siz)
     for c, ac in enumerate(act):
         vms = check_equilibrium(lms, ac)[2]
-        plt.quiver(lms[:-1], vms[:-1], np.sign(vms[:-1])*(lms[1:]-lms[:-1]), np.sign(vms[:-1])*(vms[1:]-vms[:-1]),
-                scale_units='xy', angles='xy', scale=1, color=color[c], label=f"activation={ac:0.1f}")
+        for i in range(siz-1):
+            if vms[i] >= 0:
+                ll = plt.quiver(lms[i], vms[i], lms[i+1]-lms[i], vms[i+1]-vms[i],
+                                scale_units='xy', angles='xy', scale=1, color=color[c])
+            else:
+                ll = plt.quiver(lms[i+1], vms[i+1], -lms[i+1]+lms[i], -vms[i+1]+vms[i],
+                           scale_units='xy', angles='xy', scale=1, color=color[c])
+        ll.set_label(f"activation={ac:0.1f}")
         plt.plot(lms[np.argmin(np.abs(vms))], vms[np.argmin(np.abs(vms))], 'ro')
     plt.plot(lms, np.zeros(lms.shape), 'r')
     plt.legend()
     plt.xlabel("Muscle length")
     plt.ylabel("Muscle velocity")
-    plt.ylim([-1, 1])
+    plt.ylim([-10, 10])
     plt.title("Phase space trajectory of Opensim-Thelen Hill muscle for varying activations")
     return
 
@@ -146,11 +153,11 @@ def check_dv_dl(lm, act):
     return (vm-dvm)/eps
 
 
-lmt = 0.35  # musculo-tendon len
+lmt = 0.22  # musculo-tendon len
 vmt = 0  # isostatic condition
-lm_opt = 0.25  # optimal fiber len
-lt_sl = 0.15  # tendon slack len
-alpha0 = np.pi/4  # pennation angle at optimal fiber len
+lm_opt = 0.02  # optimal fiber len
+lt_sl = 0.2  # tendon slack len
+alpha0 = np.pi/5  # pennation angle at optimal fiber len
 a = 0.5  # activation (input)
 tf = 0.1  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
@@ -167,6 +174,7 @@ sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_ou
 print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1], a)}")
 plot_phase(np.linspace(0.1, 1, num=10), sns.color_palette())
 
+plt.show()
 plt.figure()
 plt.subplot(121)
 for a_ in np.arange(0.1, 1.0, 0.1):
@@ -190,7 +198,7 @@ plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
 
 plt.figure()
 plt.subplot(121)
-for lm0 in np.arange(0.3, 0.4, 0.01):
+for lm0 in np.arange(0.5*lm0, 1.5*lm0, 0.005):
     sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
     plt.plot(time_interp[:, np.newaxis], sol.sol(time_interp).T, label=f'lm0={lm0:.2f}')
     plt.xlabel('time (s)')
@@ -208,4 +216,22 @@ for ft0 in np.arange(0.2, 0.8, 0.05):
     plt.legend()
 plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
 
+plt.figure()
+mt_ratios = np.arange(0.1, 1.5, 0.1)
+lt_sls = np.arange(0.1, 0.4, 0.05)
+lms = np.zeros((mt_ratios.shape[0]))
+for j, lt_sl in enumerate(lt_sls):
+    for i, mt_ratio in enumerate(mt_ratios):
+        lm_opt = lt_sl*mt_ratio  # optimal fiber len
+        lmt = lt_sl+lm_opt
+        lm0 = (lmt - lt_sl) / np.cos(alpha0)  # initial guess for the ivp problem (further noised)
+        sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
+        lms[i] = sol.y[0, -1]
+    plt.plot(mt_ratios, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j])
+    xx, yy = np.polyfit(mt_ratios, lms, 1)
+    plt.plot(mt_ratios, mt_ratios*xx+yy, c=sns.color_palette()[j])
+plt.xlabel('muscle/tendon length ratios')
+plt.ylabel('Muscle length at equilibrium')
+plt.title('Muscle length at equilibrium for varying muscle/tendon length ratio\nOpensim-Thelen (2003)')
+plt.legend()
 plt.show()
