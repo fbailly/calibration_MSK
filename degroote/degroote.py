@@ -159,7 +159,7 @@ lm_opt = 0.02  # optimal fiber len
 lt_sl = 0.2  # tendon slack len
 alpha0 = np.pi/5  # pennation angle at optimal fiber len
 a = 0.5  # activation (input)
-tf = 0.1  # simulation duration
+tf = 0.2  # simulation duration
 lm0 = (lmt - lt_sl)/np.cos(alpha0)  # initial guess for the ivp problem (further noised)
 ft0 = 0.5  # initial guess for the ivp problem (further noised)
 ratio_interp = 1000
@@ -217,10 +217,12 @@ for ft0 in np.arange(0.2, 0.8, 0.05):
 plt.suptitle('Opensim-Thelen ODE for muscle tendon equilibrium')
 
 plt.figure()
-plt.subplot(121)
-mt_ratios = np.arange(0.1, 1.5, 0.1)
+fig1 = plt.subplot(141)
+fig2 = plt.subplot(142)
+mt_ratios = np.arange(0.08, 1.8, 0.05)
 lt_sls = np.arange(0.1, 0.4, 0.05)
 lms = np.zeros((mt_ratios.shape[0]))
+lm0s = np.zeros((mt_ratios.shape[0]))
 for j, lt_sl in enumerate(lt_sls):
     for i, mt_ratio in enumerate(mt_ratios):
         lm_opt = lt_sl * mt_ratio  # optimal fiber len
@@ -228,32 +230,42 @@ for j, lt_sl in enumerate(lt_sls):
         lm0 = (lmt - lt_sl) / np.cos(alpha0)  # initial guess for the ivp problem (further noised)
         sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
         lms[i] = sol.y[0, -1]
-        plt.plot(sol.y[0, :], c=sns.color_palette()[j % 10])
-    plt.plot(mt_ratios, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
+        lm0s[i] = lm0
+        fig1.plot(sol.t, sol.y[0, :], c=sns.color_palette()[j % 10])
+    fig2.plot(mt_ratios, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
+    fig2.plot(mt_ratios, lm0s, 'o', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
     xx, yy = np.polyfit(mt_ratios, lms, 1)
     # plt.plot(lmts, lmts*xx+yy, c=sns.color_palette()[i%10])
-plt.xlabel('muscle/tendon length ratios')
-plt.ylabel('Muscle length at equilibrium')
-plt.title('Muscle length at equilibrium for varying muscle/tendon length ratio\nOpensim-Thelen (2003)')
+fig1.set_xlabel('time')
+fig2.set_xlabel('muscle/tendon length ratios')
+fig1.set_ylabel('Muscle length at equilibrium')
+plt.figtext(0.3, 0.95, 'Muscle length at equilibrium for varying muscle/tendon length ratio\nOpensim-Thelen (2003)',
+            ha="center", va="top")
 plt.legend()
-plt.subplot(122)
-siz = 10
+fig3 = plt.subplot(143)
+fig4 = plt.subplot(144)
+siz = 30
 lms = np.zeros((siz))
+lm0s = np.zeros((siz))
 mt_ratio = 1
 for j, lt_sl in enumerate(lt_sls):
     lm_opt = lt_sl * mt_ratio  # optimal fiber len
     lm_proj = np.cos(alpha0)*lm_opt
-    lmts = np.linspace(lt_sl+lm_proj*0.8, lt_sl+lm_proj*1.2, num=siz)
+    lmts = np.linspace(lt_sl+lm_proj*0.6, lt_sl+lm_proj*1.5, num=siz)
     for i, lmt in enumerate(lmts):
         lm0 = (lmt - lt_sl) / np.cos(alpha0)  # initial guess for the ivp problem (further noised)
         sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
         lms[i] = sol.y[0, -1]
-        plt.plot(sol.y[0, :], c=sns.color_palette()[j % 10])
-    plt.plot(lmts/lt_sl, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
+        lm0s[i] = lm0
+        fig3.plot(sol.t, sol.y[0, :], c=sns.color_palette()[j % 10])
+    fig4.plot(lmts/lt_sl, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
+    fig4.plot(lmts/lt_sl, lm0s, 'o', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
     xx, yy = np.polyfit(lmts/lt_sl, lms, 1)
     # plt.plot(lmts/lt_sl, lmts/lt_sl*xx+yy, c=sns.color_palette()[i%10])
-plt.xlabel('normalized muscle stretch (lmt/lt_sl)')
-plt.ylabel('Muscle length at equilibrium')
-plt.title('Muscle length at equilibrium for varying muscle stretch\n and mt_ratio = 1. Opensim-Thelen (2003)')
+fig3.set_xlabel('time')
+fig4.set_xlabel('normalized muscle stretch (lmt/lt_sl)')
+fig3.set_ylabel('Muscle length at equilibrium')
+plt.figtext(0.7, 0.95, 'Muscle length at equilibrium for varying muscle stretch\n and mt_ratio = 1. Opensim-Thelen (2003)',
+            ha="center", va="top")
 plt.legend()
 plt.show()
