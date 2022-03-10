@@ -174,7 +174,6 @@ sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_ou
 print(f"After solving, steady state is lm={sol.y[0, -1]}, equilibirum is {check_equilibrium(sol.y[0, -1], a)}")
 plot_phase(np.linspace(0.1, 1, num=10), sns.color_palette())
 
-plt.show()
 plt.figure()
 plt.subplot(121)
 for a_ in np.arange(0.1, 1.0, 0.1):
@@ -234,8 +233,8 @@ for j, lt_sl in enumerate(lt_sls):
         fig1.plot(sol.t, sol.y[0, :], c=sns.color_palette()[j % 10])
     fig2.plot(mt_ratios, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
     fig2.plot(mt_ratios, lm0s, 'o', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
-    xx, yy = np.polyfit(mt_ratios, lms, 1)
-    # plt.plot(lmts, lmts*xx+yy, c=sns.color_palette()[i%10])
+    p1, p0 = np.polyfit(mt_ratios, lms, 1)
+    # plt.plot(lmts, lmts*p1+p0, c=sns.color_palette()[i%10])
 fig1.set_xlabel('time')
 fig2.set_xlabel('muscle/tendon length ratios')
 fig1.set_ylabel('Muscle length at equilibrium')
@@ -247,21 +246,22 @@ fig4 = plt.subplot(144)
 siz = 30
 lms = np.zeros((siz))
 lm0s = np.zeros((siz))
-mt_ratio = 1
+mt_ratio = 0.2
+a = 0.5
 for j, lt_sl in enumerate(lt_sls):
     lm_opt = lt_sl * mt_ratio  # optimal fiber len
     lm_proj = np.cos(alpha0)*lm_opt
     lmts = np.linspace(lt_sl+lm_proj*0.6, lt_sl+lm_proj*1.5, num=siz)
     for i, lmt in enumerate(lmts):
-        lm0 = (lmt - lt_sl) / np.cos(alpha0)  # initial guess for the ivp problem (further noised)
+        lm0 = (lmt - lt_sl) / (np.cos(alpha0))  # initial guess for the ivp problem (further noised)
         sol = solve_ivp(lm_ode_opensim, (0, tf), y0=np.array([lm0]), args=(a,), dense_output=True, method='RK23')
         lms[i] = sol.y[0, -1]
         lm0s[i] = lm0
         fig3.plot(sol.t, sol.y[0, :], c=sns.color_palette()[j % 10])
     fig4.plot(lmts/lt_sl, lms, 'x', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
     fig4.plot(lmts/lt_sl, lm0s, 'o', label=f'lt_sl={lt_sl:0.2f}', c=sns.color_palette()[j % 10])
-    xx, yy = np.polyfit(lmts/lt_sl, lms, 1)
-    # plt.plot(lmts/lt_sl, lmts/lt_sl*xx+yy, c=sns.color_palette()[i%10])
+    p2, p1, p0 = np.polyfit(lmts/lt_sl, lms, 2)
+    plt.plot(lmts/lt_sl, (lmts/lt_sl)**2*p2 + lmts/lt_sl*p1+p0, c=sns.color_palette()[j % 10])
 fig3.set_xlabel('time')
 fig4.set_xlabel('normalized muscle stretch (lmt/lt_sl)')
 fig3.set_ylabel('Muscle length at equilibrium')
